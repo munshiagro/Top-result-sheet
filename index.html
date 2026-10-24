@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>রেজাল্ট কার্ড তৈরি</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Bengali:wght@400;600;700&family=Noto+Serif+Bengali:wght@400;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+:root{--line:#d6ddd9;--bg:#eef2f0;--ui:#0f6b5a;--ink:#22302b;--tint:#fbd5b5;--hl:#fac090;--fs:12px}
+*{box-sizing:border-box}
+body{margin:0;font-family:"Noto Sans Bengali",system-ui,sans-serif;color:var(--ink);background:var(--bg)}
+.app{display:grid;grid-template-columns:310px 1fr;min-height:100vh}
+aside{background:#fff;border-right:1px solid var(--line);padding:18px;display:flex;flex-direction:column;gap:13px}
+h1{font-size:19px;margin:0}
+label{display:block;font-size:13px;font-weight:600;margin-bottom:4px}
+input[type=text],input[type=number],select{width:100%;padding:7px;border:1px solid var(--line);border-radius:6px;font:inherit}
+input[type=color]{width:100%;height:34px;border:1px solid var(--line);border-radius:6px;padding:2px}
+input[type=range]{width:100%}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.drop{border:2px dashed var(--ui);border-radius:10px;padding:16px;text-align:center;cursor:pointer;background:#f6faf8;font-size:14px}
+.drop.on{background:#e3f1ec}
+.drop small{display:block;color:#66756e;margin-top:3px}
+button{font:inherit;font-weight:700;padding:11px;border:0;border-radius:8px;background:var(--ui);color:#fff;cursor:pointer}
+button:disabled{opacity:.4;cursor:not-allowed}
+.hint{font-size:12px;color:#66756e;line-height:1.5;margin:0}
+main{padding:22px;overflow:auto}
+.sheet{background:#fff;margin:0 auto;padding:16px;width:fit-content;max-width:100%;min-width:60%;box-shadow:0 1px 6px rgba(0,0,0,.15);overflow-x:auto;
+  font-family:"Times New Roman","Noto Serif Bengali",serif;font-size:var(--fs);color:#000}
+.sheet h2{margin:0 0 8px;font-size:1.6em;text-align:center}
+.empty{font-family:"Noto Sans Bengali",sans-serif;color:#66756e;text-align:center;padding:60px 20px}
+table.main{border-collapse:collapse;width:100%}
+table.main td,table.main th{border:1px solid #000;padding:.12em .5em;text-align:center;font-weight:400;line-height:1.35}
+table.main th.infoTh{border:0;padding:0;text-align:left}
+table.info{border-collapse:collapse;margin:0}
+table.info td{border:1px solid #000;background:var(--tint);padding:.12em .5em;text-align:left;line-height:1.35}
+table.info td.l{white-space:nowrap;min-width:9em}
+table.info td.v{min-width:15em}
+table.info td.n{text-align:right}
+tr.hl td{background:var(--hl)}
+@media(max-width:800px){.app{grid-template-columns:1fr}aside{border-right:0;border-bottom:1px solid var(--line)}}
+@media print{
+  body{background:#fff}
+  aside{display:none}
+  .app{display:block}
+  main{padding:0;overflow:visible}
+  .sheet{box-shadow:none;padding:0;width:auto;max-width:none;min-width:0;overflow:visible}
+  *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  tr{break-inside:avoid}
+  thead{display:table-header-group}
+}
+</style>
+<style id="pagecss">@page{size:A4 landscape;margin:10mm}</style>
+</head>
+<body>
+<div class="app">
+<aside>
+  <h1>রেজাল্ট কার্ড তৈরি</h1>
+  <div class="drop" id="drop">এক্সেল ফাইল এখানে ছাড়ুন বা ক্লিক করুন<small>.xlsx, .xls, .csv</small></div>
+  <input type="file" id="file" accept=".xlsx,.xls,.csv" hidden>
+  <div id="sheetBox" hidden><label for="sheetSel">শিট</label><select id="sheetSel"></select></div>
+  <div><label for="hdr">টেবিলের হেডার কত নম্বর সারিতে</label><input type="number" id="hdr" min="1" value="1">
+    <p class="hint">উপরের নাম/রোল/ইমেইল অংশ অটো আলাদা হয়। ভুল হলে এখানে ঠিক করুন।</p></div>
+  <div><label for="title">শিরোনাম (ঐচ্ছিক)</label><input type="text" id="title" placeholder="যেমন: রেজাল্ট কার্ড"></div>
+  <div><label for="kw">যে সারি রঙিন হবে (শব্দ লিখুন)</label><input type="text" id="kw" value="Weekly"></div>
+  <div class="row2">
+    <div><label for="hl">সারির রং</label><input type="color" id="hl" value="#fac090"></div>
+    <div><label for="tint">উপরের তথ্যের রং</label><input type="color" id="tint" value="#fbd5b5"></div>
+  </div>
+  <div><label for="fs">লেখার সাইজ: <span id="fsv">12</span>px</label><input type="range" id="fs" min="8" max="18" value="12"></div>
+  <div><label for="orient">পেজ</label>
+    <select id="orient"><option value="landscape">A4 আড়াআড়ি</option><option value="portrait">A4 লম্বা</option></select></div>
+  <button id="print" disabled>পিডিএফ ডাউনলোড</button>
+  <p class="hint">বাটনে ক্লিক করলে প্রিন্ট উইন্ডো খুলবে। সেখানে প্রিন্টার হিসেবে "Save as PDF" বেছে নিন। একাধিক পেজ হলে প্রতি পেজে উপরের তথ্য ও হেডার আবার আসবে। ফাইল আপনার ব্রাউজারেই থাকে, কোথাও আপলোড হয় না।</p>
+</aside>
+<main>
+  <div class="sheet" id="sheet"><div class="empty">প্রিভিউ দেখতে একটি এক্সেল ফাইল আপলোড করুন।</div></div>
+</main>
+</div>
+<script>
+const $=id=>document.getElementById(id);
+let wb=null,rows=[],fname='result-card';
+const esc=s=>String(s??'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+const filled=r=>r.filter(c=>String(c).trim()!=='').length;
+const isNum=v=>/^-?[\d,]*\.?\d+$/.test(String(v).trim());
+
+function load(file){
+  fname=file.name.replace(/\.[^.]+$/,'');
+  const r=new FileReader();
+  r.onload=e=>{
+    try{
+      wb=XLSX.read(e.target.result,{type:'array'});
+      $('sheetSel').innerHTML=wb.SheetNames.map((n,i)=>`<option value="${i}">${esc(n)}</option>`).join('');
+      $('sheetBox').hidden=wb.SheetNames.length<2;
+      pick(0);
+    }catch(err){$('sheet').innerHTML='<div class="empty">ফাইলটি পড়া যায়নি। .xlsx বা .csv ফাইল দিন।</div>'}
+  };
+  r.readAsArrayBuffer(file);
+}
+function pick(i){
+  const ws=wb.Sheets[wb.SheetNames[i]];
+  // raw:false = এক্সেলে যেমন দেখায় ঠিক তেমন (তারিখ, দশমিক)
+  rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:'',raw:false}).filter(r=>filled(r)>0);
+  let h=rows.findIndex(r=>filled(r)>=3);
+  $('hdr').value=(h<0?0:h)+1;
+  $('print').disabled=!rows.length;
+  render();
+}
+function render(){
+  const root=document.documentElement.style;
+  root.setProperty('--hl',$('hl').value);
+  root.setProperty('--tint',$('tint').value);
+  root.setProperty('--fs',$('fs').value+'px');
+  $('fsv').textContent=$('fs').value;
+  $('pagecss').textContent=`@page{size:A4 ${$('orient').value};margin:10mm}`;
+  if(!rows.length)return;
+  const hi=Math.min(Math.max(0,(+$('hdr').value||1)-1),rows.length-1);
+  const info=rows.slice(0,hi),head=rows[hi],body=rows.slice(hi+1);
+  const cols=Math.max(...rows.slice(hi).map(r=>r.length));
+  const kw=$('kw').value.trim().toLowerCase();
+  let h='';
+  if($('title').value.trim())h+=`<h2>${esc($('title').value)}</h2>`;
+  h+='<table class="main"><thead>';
+  if(info.length){
+    h+=`<tr><th class="infoTh" colspan="${cols}"><table class="info">`;
+    info.forEach(r=>{
+      const cells=r.map(c=>String(c).trim()).filter(Boolean);
+      const label=cells[0]??'',val=cells.slice(1).join(' ');
+      h+=`<tr><td class="l">${esc(label)}</td><td class="v ${isNum(val)?'n':''}">${esc(val)}</td></tr>`;
+    });
+    h+='</table></th></tr>';
+  }
+  h+='<tr>';
+  for(let c=0;c<cols;c++)h+=`<th>${esc(head[c])}</th>`;
+  h+='</tr></thead><tbody>';
+  body.forEach(r=>{
+    const hit=kw&&r.some(c=>String(c).toLowerCase().includes(kw));
+    h+=`<tr class="${hit?'hl':''}">`;
+    for(let c=0;c<cols;c++)h+=`<td>${esc(r[c])}</td>`;
+    h+='</tr>';
+  });
+  $('sheet').innerHTML=h+'</tbody></table>';
+}
+$('drop').onclick=()=>$('file').click();
+$('file').onchange=e=>e.target.files[0]&&load(e.target.files[0]);
+['dragover','dragenter'].forEach(t=>$('drop').addEventListener(t,e=>{e.preventDefault();$('drop').classList.add('on')}));
+['dragleave','drop'].forEach(t=>$('drop').addEventListener(t,e=>{e.preventDefault();$('drop').classList.remove('on')}));
+$('drop').addEventListener('drop',e=>e.dataTransfer.files[0]&&load(e.dataTransfer.files[0]));
+$('sheetSel').onchange=e=>pick(+e.target.value);
+['hdr','title','kw','hl','tint','fs','orient'].forEach(id=>$(id).addEventListener('input',render));
+$('print').onclick=()=>{document.title=fname;window.print()};
+</script>
+</body>
+</html>
